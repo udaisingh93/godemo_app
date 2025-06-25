@@ -10,21 +10,24 @@ import (
 	"encoding/json"
 	vault "github.com/hashicorp/vault/api"
 )
-type Response struct {
-	Status          string `json:"status"`
-	RequestMetadata struct {
-		URL         string `json:"url"`
-		ServiceName string `json:"service name"`
-		Username    string `json:"username"`
-	} `json:"request metadata"`
-	Beamtimes struct {
-		Count int                    `json:"count"`
-		Data  map[string]Beamtime `json:"-"`
-	} `json:"beamtimes"`
-	RawBeamtimes map[string]json.RawMessage `json:"beamtimes"`
+type ParsedResponse struct {
+	Status          string
+	RequestMetadata RequestMetadata
+	Beamtimes       map[string]BeamtimeDetails
 }
 
-type Beamtime struct {
+type Response struct {
+	Status          string `json:"status"`
+	RequestMetadata RequestMetadata `json:"request metadata"`
+	Beamtimes      map[string]json.RawMessage      `json:"beamtimes"`
+}
+type RequestMetadata struct {
+	URL       string `json:"url"`
+	ServiceName   string `json:"service name"`
+	Username  string `json:"username"`
+}
+
+type BeamtimeDetails struct {
 	Proposal       string `json:"proposal"`
 	Beamline       string `json:"beamline"`
 	ExperimentStart string `json:"experiment start"`
@@ -115,22 +118,39 @@ func fetchBeamtimes(username string,doorToken string, doorServiceAccount string,
 	if err := json.Unmarshal(body, &r); err != nil {
 		log.Fatalf("Error unmarshalling JSON: %v", err)
 	}
-
-	// Extract beamtimes
-	if rawBeamtimes, ok := r.RawBeamtimes["11001029"]; ok {
-		var bt Beamtime
-		if err := json.Unmarshal(rawBeamtimes, &bt); err != nil {
-			log.Fatalf("Error parsing beamtime data: %v", err)
+	println("Response Status:", r.Status)
+	println("Request URL:", r.RequestMetadata.URL)
+	println("Request Service Name:", r.RequestMetadata.ServiceName)
+	println("Request Username:", r.RequestMetadata.Username)
+	println("Beamtimes Count:", r.Beamtimes)
+	beamtimeMap := make(map[string]BeamtimeDetails)
+	// Print all beamtimes
+	for key, raw := range r.Beamtimes {
+		if key == "count" {
+			continue // Skip the count key
 		}
-
-		fmt.Println("Beamtime ID: 11001029")
+		var bt BeamtimeDetails
+		if err := json.Unmarshal(raw, &bt); err != nil {
+			log.Fatalf("Error parsing beamtime data for key %s: %v", key, err)
+		}
+		beamtimeMap[key] = bt
+	}
+	// Print details for each beamtime
+	for id, bt := range beamtimeMap {
+		fmt.Println("-----------------------------")
+		// fmt.Printf("Beamtime ID: %s\n", id)
+		fmt.Printf("Beamtime ID: %s\n", id)
 		fmt.Printf("Proposal: %s\n", bt.Proposal)
 		fmt.Printf("Beamline: %s\n", bt.Beamline)
 		fmt.Printf("Experiment Start: %s\n", bt.ExperimentStart)
 		fmt.Printf("Experiment End: %s\n", bt.ExperimentEnd)
-	} else {
-		fmt.Println("No beamtime found")
+		fmt.Println("-----------------------------")
 	}
+	return ParsedResponse{
+		Status:          raw.Status,
+		RequestMetadata: raw.RequestMetadata,
+		Beamtimes:       beamtimeMap,
+	}, nil
 }
 func handler(w http.ResponseWriter, r *http.Request) {
 	// Log headers
