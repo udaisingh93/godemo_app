@@ -1,4 +1,4 @@
-module godemo_app
+module doorauth
 
 go 1.23.0
 
