@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -249,7 +249,7 @@ func fetchBeamtimes(w http.ResponseWriter,username string,doorToken string, door
 	}
 	defer resp.Body.Close()
 	// Read and parse the response body
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalf("Error reading response body: %v", err)
 	}
